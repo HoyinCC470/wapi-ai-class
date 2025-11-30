@@ -18,13 +18,18 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# === 3. 深度美化 CSS (包含深色模式修复) ===
+# === 3. 深度美化 CSS ===
 st.markdown("""
 <style>
-    /* 1. 隐藏多余元素 */
+    /* 1. 隐藏多余元素，保留 Header 以修复汉堡菜单 */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
+    .stAppDeployButton {display: none;}
+    
+    header {
+        visibility: visible !important;
+        background-color: transparent !important;
+    }
     
     /* 2. 全局字体与背景优化 */
     .stApp {
@@ -79,11 +84,19 @@ def stream_wrapper(response_stream):
         if chunk.choices and chunk.choices[0].delta.content:
             yield chunk.choices[0].delta.content
 
-# === 6. 侧边栏布局 ===
+# === 6. 侧边栏布局 (Logo 修改处) ===
 with st.sidebar:
-    st.image("https://img.icons8.com/fluency/96/artificial-intelligence.png", width=60)
+    # --- 修改开始: 尝试读取本地 Logo，如果没有则使用默认图标 ---
+    try:
+        # 尝试加载您上传的 logo.png，宽度设为 150 看起来更大气
+        st.image("logo.png", width=150) 
+    except:
+        # 如果您还没上传 logo.png，就显示这个默认的
+        st.image("https://img.icons8.com/fluency/96/artificial-intelligence.png", width=60)
+    # --- 修改结束 ---
+
     st.markdown("## 未湃WAPI·AIGC")
-    st.caption("Ver 4.1 Pro | 团队专用")
+    st.caption("Ver 4.3 Brand | 团队专用")
     st.markdown("---")
     
     mode = st.radio(
@@ -139,7 +152,7 @@ if mode == "📝 剧本创作中心":
             except Exception as e:
                 st.error(f"网络请求中断: {e}")
 
-# --- B. 分镜绘制 (本次修正重点) ---
+# --- B. 分镜绘制 ---
 elif mode == "🎨 分镜绘图工坊":
     st.subheader("🎨 分镜绘图工坊")
     st.caption("由 Qwen image / Flux 提供图像生成支持")
@@ -187,11 +200,7 @@ elif mode == "🎨 分镜绘图工坊":
                         )
                         image_url = res.data[0].url
                         
-                        # --- 修正点 1: 修复代码警告 ---
-                        # use_column_width 改为 use_container_width
                         st.image(image_url, use_container_width=True, caption="生成结果")
-                        
-                        # --- 修正点 2 & 3: 移除链接，添加提示 ---
                         st.success("生成完毕！")
                         st.warning("⚠️ 生成图片非永久保留，请尽快保存到本地。")
                         
