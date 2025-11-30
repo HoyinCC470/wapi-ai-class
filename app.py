@@ -13,72 +13,117 @@ IMAGE_MODEL = "dall-e-3"
 # === 2. 页面设置 ===
 st.set_page_config(
     page_title="未湃WAPI·AIGC工作台",
-    page_icon="🎬",
+    page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# === 3. 注入自定义 CSS ===
+# === 3. 深度美化 CSS (包含深色模式修复) ===
 st.markdown("""
 <style>
+    /* 1. 隐藏多余元素 */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    .stApp { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
-    h1 { color: #1E1E1E; font-weight: 700; letter-spacing: -1px; }
-    section[data-testid="stSidebar"] { background-color: #f7f9fa; border-right: 1px solid #e0e0e0; }
-    div.stButton > button { width: 100%; border-radius: 8px; font-weight: bold; transition: all 0.2s; }
-    .stChatMessage { border-radius: 10px; padding: 10px; }
+    
+    /* 2. 全局字体与背景优化 */
+    .stApp {
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }
+    
+    /* 3. 侧边栏强制配色 */
+    [data-testid="stSidebar"] {
+        background-color: #f5f7f9 !important; 
+        border-right: 1px solid #e0e0e0;
+    }
+    
+    /* 4. 侧边栏文字颜色强制修正 */
+    [data-testid="stSidebar"] * {
+        color: #333333 !important; 
+    }
+    [data-testid="stSidebar"] input, [data-testid="stSidebar"] select {
+        color: #333333 !important;
+        background-color: #ffffff !important;
+    }
+
+    /* 5. 聊天气泡美化 */
+    .stChatMessage {
+        background-color: transparent;
+        border-radius: 10px;
+        padding: 10px;
+    }
+    [data-testid="chatAvatarIcon-user"] {
+        background-color: #4F46E5 !important;
+    }
+    
+    /* 6. 按钮样式增强 */
+    div.stButton > button {
+        border-radius: 8px;
+        font-weight: 600;
+        border: none;
+        transition: all 0.2s;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# === 4. 初始化客户端 ===
+# === 4. 客户端初始化 ===
 if not API_KEY or not API_BASE:
     st.error("⚠️ 未检测到 API 配置，请检查 Zeabur 环境变量！")
     st.stop()
 
 client = OpenAI(api_key=API_KEY, base_url=API_BASE)
 
-# === 5. 侧边栏设计 ===
+# === 5. 高级流式处理函数 ===
+def stream_wrapper(response_stream):
+    for chunk in response_stream:
+        if chunk.choices and chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
+
+# === 6. 侧边栏布局 ===
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/artificial-intelligence.png", width=60)
-    st.title("未湃WAPI·AIGC工作台")
-    st.caption("Ver 3.2 Pro | 极致丝滑版")
+    st.markdown("## 未湃WAPI·AIGC")
+    st.caption("Ver 4.1 Pro | 团队专用")
     st.markdown("---")
     
     mode = st.radio(
-        "选择工作流:",
+        "工作流选择:",
         ["📝 剧本创作中心", "🎨 分镜绘图工坊"],
-        captions=["由 Deepseek V3.2 模型提供支持", "由 Qwen image 1.0 提供支持"]
+        captions=["Deepseek V3.2 驱动", "Qwen Image / Flux 驱动"]
     )
     
     st.markdown("---")
-    if st.button("🗑️ 清空对话历史", type="secondary"):
+    with st.expander("💡 提示词指南"):
+        st.markdown("""
+        **剧本：** 设定清晰的角色、冲突和结局。
+        
+        **分镜：** *公式：主体 + 环境 + 风格 + 光影* 例：赛博朋克街道，雨夜，霓虹灯，电影感
+        """)
+    
+    st.markdown("---")
+    if st.button("🗑️ 清空历史", type="secondary"):
         st.session_state.messages = []
         st.rerun()
 
-# === 6. 主逻辑区域 ===
+# === 7. 业务逻辑 ===
 
+# --- A. 剧本创作 ---
 if mode == "📝 剧本创作中心":
-    st.header("📝 剧本创作助手")
+    st.subheader("📝 剧本创作助手")
     st.caption("由 Deepseek V3.2 提供强力推理支持")
 
     if "messages" not in st.session_state:
         st.session_state["messages"] = [{"role": "assistant", "content": "你好！我是未湃WAPI的智能编剧搭档。我们可以开始写大纲了吗？"}]
 
-    # 渲染历史消息
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"], avatar="🤖" if msg["role"] == "assistant" else "👤"):
             st.write(msg["content"])
 
-    # 处理输入
     if prompt := st.chat_input("输入你的创意..."):
-        # 1. 显示用户输入
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user", avatar="👤"):
             st.write(prompt)
 
-        # 2. AI 生成 (使用 write_stream 实现丝滑效果)
         with st.chat_message("assistant", avatar="🤖"):
             try:
                 stream = client.chat.completions.create(
@@ -86,23 +131,23 @@ if mode == "📝 剧本创作中心":
                     messages=st.session_state.messages,
                     stream=True
                 )
-                # --- 关键修改：使用 st.write_stream 代替手动循环 ---
-                # 这个函数会自动处理缓冲和平滑渲染，彻底告别卡顿
-                response = st.write_stream(stream)
-                # ----------------------------------------------
+                response = st.write_stream(stream_wrapper(stream))
                 
-                st.session_state.messages.append({"role": "assistant", "content": response})
+                if response:
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+                    
             except Exception as e:
-                st.error(f"生成失败: {e}")
+                st.error(f"网络请求中断: {e}")
 
+# --- B. 分镜绘制 (本次修正重点) ---
 elif mode == "🎨 分镜绘图工坊":
-    st.header("🎨 分镜绘图工坊")
-    st.caption("由 Qwen image 1.0 提供图像生成支持")
+    st.subheader("🎨 分镜绘图工坊")
+    st.caption("由 Qwen image / Flux 提供图像生成支持")
 
     col1, col2 = st.columns([1, 1.5])
 
     with col1:
-        st.subheader("🛠️ 参数设置")
+        st.markdown("##### 🛠️ 参数配置")
         style_preset = st.selectbox(
             "选择画面风格",
             ["无 (默认)", "电影质感 (Cinematic)", "赛博朋克 (Cyberpunk)", "吉卜力动漫 (Anime)", "水墨中国风 (Ink Style)", "3D皮克斯 (3D Render)"]
@@ -113,11 +158,11 @@ elif mode == "🎨 分镜绘图工坊":
         final_prompt = img_prompt
         if style_preset != "无 (默认)":
             style_suffix = {
-                "电影质感 (Cinematic)": ", cinematic lighting, 8k, realistic, shallow depth of field, movie still",
-                "赛博朋克 (Cyberpunk)": ", cyberpunk style, neon lights, futuristic city, high contrast",
-                "吉卜力动漫 (Anime)": ", studio ghibli style, anime art, vibrant colors, detailed background",
-                "水墨中国风 (Ink Style)": ", traditional chinese ink painting, black and white, artistic, masterpiece",
-                "3D皮克斯 (3D Render)": ", pixar style, 3d render, unreal engine 5, cute, soft lighting"
+                "电影质感 (Cinematic)": ", cinematic lighting, 8k, realistic, shallow depth of field, movie still, color graded",
+                "赛博朋克 (Cyberpunk)": ", cyberpunk style, neon lights, futuristic city, high contrast, ray tracing",
+                "吉卜力动漫 (Anime)": ", studio ghibli style, anime art, vibrant colors, detailed background, hand drawn feel",
+                "水墨中国风 (Ink Style)": ", traditional chinese ink painting, black and white, artistic, masterpiece, splashing ink",
+                "3D皮克斯 (3D Render)": ", pixar style, 3d render, unreal engine 5, cute, soft lighting, clay texture"
             }
             if img_prompt:
                 final_prompt += style_suffix[style_preset]
@@ -125,10 +170,10 @@ elif mode == "🎨 分镜绘图工坊":
         generate_btn = st.button("✨ 开始生成画面", type="primary")
         
         if final_prompt:
-            st.info(f"实际发送的提示词：\n{final_prompt}")
+            st.info(f"最终发送提示词：\n{final_prompt}")
 
     with col2:
-        st.subheader("🖼️ 画面预览")
+        st.markdown("##### 🖼️ 画面预览")
         if generate_btn:
             if not img_prompt:
                 st.warning("请先输入画面描述！")
@@ -141,8 +186,14 @@ elif mode == "🎨 分镜绘图工坊":
                             size="1024x1024"
                         )
                         image_url = res.data[0].url
-                        st.image(image_url, use_column_width=True, caption="生成结果")
+                        
+                        # --- 修正点 1: 修复代码警告 ---
+                        # use_column_width 改为 use_container_width
+                        st.image(image_url, use_container_width=True, caption="生成结果")
+                        
+                        # --- 修正点 2 & 3: 移除链接，添加提示 ---
                         st.success("生成完毕！")
-                        st.markdown(f"[📥 点击这里在新窗口打开图片]({image_url})")
+                        st.warning("⚠️ 生成图片非永久保留，请尽快保存到本地。")
+                        
                     except Exception as e:
                         st.error(f"绘图失败: {e}")
