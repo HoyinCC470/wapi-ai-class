@@ -1,6 +1,7 @@
 import streamlit as st
 from openai import OpenAI
 import os
+import base64
 
 # === 1. 基础配置 ===
 API_BASE = os.getenv("API_BASE", "")
@@ -18,55 +19,77 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# === 3. 深度美化 CSS ===
+# === 3. Gemini 风格深度美化 CSS ===
 st.markdown("""
 <style>
-    /* 1. 隐藏多余元素，保留 Header 以修复汉堡菜单 */
+    /* --- 全局隐藏清理 --- */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stAppDeployButton {display: none;}
     
+    /* 修复汉堡菜单可见性 */
     header {
         visibility: visible !important;
         background-color: transparent !important;
     }
     
-    /* 2. 全局字体与背景优化 */
-    .stApp {
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    }
-    
-    /* 3. 侧边栏强制配色 */
+    /* --- 侧边栏：Gemini 深色风格 --- */
     [data-testid="stSidebar"] {
-        background-color: #f5f7f9 !important; 
-        border-right: 1px solid #e0e0e0;
+        background-color: #1e1e1e !important; /* Gemini 深灰背景 */
+        border-right: 1px solid #333333;
     }
     
-    /* 4. 侧边栏文字颜色强制修正 */
-    [data-testid="stSidebar"] * {
-        color: #333333 !important; 
+    /* 侧边栏文字：强制白色/浅灰 */
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+        color: #ffffff !important;
+        text-align: center; /* 标题居中 */
     }
-    [data-testid="stSidebar"] input, [data-testid="stSidebar"] select {
-        color: #333333 !important;
-        background-color: #ffffff !important;
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label {
+        color: #e0e0e0 !important;
+    }
+    
+    /* 侧边栏输入组件美化 (适配深色背景) */
+    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] {
+        color: #ffffff;
+    }
+    
+    /* --- 关键：Logo 图片居中 --- */
+    [data-testid="stSidebar"] [data-testid="stImage"] {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+    [data-testid="stSidebar"] [data-testid="stImage"] img {
+        object-fit: contain;
     }
 
-    /* 5. 聊天气泡美化 */
-    .stChatMessage {
-        background-color: transparent;
-        border-radius: 10px;
-        padding: 10px;
-    }
-    [data-testid="chatAvatarIcon-user"] {
-        background-color: #4F46E5 !important;
+    /* --- 主界面优化 --- */
+    .stApp {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
     
-    /* 6. 按钮样式增强 */
+    /* 聊天气泡：更现代的圆角 */
+    .stChatMessage {
+        background-color: transparent;
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 10px;
+    }
+    /* 用户气泡强调色 */
+    [data-testid="chatAvatarIcon-user"] {
+        background-color: #4c8bf5 !important; /* Gemini Blue */
+    }
+    
+    /* 按钮：Gemini 风格圆角按钮 */
     div.stButton > button {
-        border-radius: 8px;
+        border-radius: 20px;
         font-weight: 600;
-        border: none;
+        border: 1px solid #444;
         transition: all 0.2s;
+    }
+    div.stButton > button:hover {
+        border-color: #4c8bf5;
+        color: #4c8bf5;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -84,19 +107,23 @@ def stream_wrapper(response_stream):
         if chunk.choices and chunk.choices[0].delta.content:
             yield chunk.choices[0].delta.content
 
-# === 6. 侧边栏布局 (Logo 修改处) ===
+# === 6. 侧边栏布局 (居中优化版) ===
 with st.sidebar:
-    # --- 修改开始: 尝试读取本地 Logo，如果没有则使用默认图标 ---
+    # 1. LOGO 部分
     try:
-        # 尝试加载您上传的 logo.png，宽度设为 150 看起来更大气
-        st.image("logo.png", width=150) 
+        # 尝试读取 logo.png，宽度调大一点
+        st.image("logo.png", width=140) 
     except:
-        # 如果您还没上传 logo.png，就显示这个默认的
-        st.image("https://img.icons8.com/fluency/96/artificial-intelligence.png", width=60)
-    # --- 修改结束 ---
+        st.image("https://img.icons8.com/fluency/96/artificial-intelligence.png", width=80)
 
-    st.markdown("## 未湃WAPI·AIGC")
-    st.caption("Ver 4.3 Brand | 团队专用")
+    # 2. 标题和版本号 (使用 HTML 强制居中)
+    st.markdown("""
+        <div style="text-align: center; margin-top: -10px; margin-bottom: 20px;">
+            <h2 style="color: white; margin:0; font-size: 20px;">未湃WAPI·AIGC</h2>
+            <p style="color: #888; font-size: 12px; margin-top: 5px;">Ver 4.4 Pro | 团队专用</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
     st.markdown("---")
     
     mode = st.radio(
@@ -110,7 +137,7 @@ with st.sidebar:
         st.markdown("""
         **剧本：** 设定清晰的角色、冲突和结局。
         
-        **分镜：** *公式：主体 + 环境 + 风格 + 光影* 例：赛博朋克街道，雨夜，霓虹灯，电影感
+        **分镜：** *主体 + 环境 + 风格 + 光影*
         """)
     
     st.markdown("---")
