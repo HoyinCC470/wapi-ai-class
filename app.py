@@ -2,13 +2,11 @@ import streamlit as st
 from openai import OpenAI
 import os
 
-# === 1. 基础配置 (从环境变量读取) ===
+# === 1. 基础配置 ===
 API_BASE = os.getenv("API_BASE", "")
 API_KEY = os.getenv("API_KEY", "")
 
-# 这里的模型名保持 "通用替身"，由您的 OneAPI 进行重定向
-# 文本 -> OneAPI 指向 Deepseek V3.2
-# 生图 -> OneAPI 指向 Qwen Image (或者您之前配置的Flux/Kolors)
+# 模型配置
 TEXT_MODEL = "gpt-3.5-turbo"
 IMAGE_MODEL = "dall-e-3"
 
@@ -20,45 +18,17 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# === 3. 注入自定义 CSS (美化魔法) ===
+# === 3. 注入自定义 CSS ===
 st.markdown("""
 <style>
-    /* 隐藏默认菜单和页脚 */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    
-    /* 全局字体优化 */
-    .stApp {
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    }
-    
-    /* 标题样式 */
-    h1 {
-        color: #1E1E1E;
-        font-weight: 700;
-        letter-spacing: -1px;
-    }
-    
-    /* 侧边栏美化 */
-    section[data-testid="stSidebar"] {
-        background-color: #f7f9fa;
-        border-right: 1px solid #e0e0e0;
-    }
-    
-    /* 按钮样式增强 */
-    div.stButton > button {
-        width: 100%;
-        border-radius: 8px;
-        font-weight: bold;
-        transition: all 0.2s;
-    }
-    
-    /* 聊天框气泡优化 */
-    .stChatMessage {
-        border-radius: 10px;
-        padding: 10px;
-    }
+    .stApp { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+    h1 { color: #1E1E1E; font-weight: 700; letter-spacing: -1px; }
+    section[data-testid="stSidebar"] { background-color: #f7f9fa; border-right: 1px solid #e0e0e0; }
+    div.stButton > button { width: 100%; border-radius: 8px; font-weight: bold; transition: all 0.2s; }
+    .stChatMessage { border-radius: 10px; padding: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -71,10 +41,9 @@ client = OpenAI(api_key=API_KEY, base_url=API_BASE)
 
 # === 5. 侧边栏设计 ===
 with st.sidebar:
-    # 这里换了一个更现代的图标
     st.image("https://img.icons8.com/fluency/96/artificial-intelligence.png", width=60)
     st.title("未湃WAPI·AIGC工作台")
-    st.caption("Ver 3.0 Pro | 团队专用")
+    st.caption("Ver 3.2 Pro | 极致丝滑版")
     st.markdown("---")
     
     mode = st.radio(
@@ -82,15 +51,6 @@ with st.sidebar:
         ["📝 剧本创作中心", "🎨 分镜绘图工坊"],
         captions=["由 Deepseek V3.2 模型提供支持", "由 Qwen image 1.0 提供支持"]
     )
-    
-    st.markdown("---")
-    st.markdown("### 💡 创作贴士")
-    with st.expander("如何写出好提示词？"):
-        st.markdown("""
-        - **剧本：** 明确类型、角色、冲突。
-        - **画面：** 主体 + 环境 + 光影 + 风格。
-        - *例如：赛博朋克街道，雨夜，霓虹灯，8k分辨率*
-        """)
     
     st.markdown("---")
     if st.button("🗑️ 清空对话历史", type="secondary"):
@@ -106,30 +66,32 @@ if mode == "📝 剧本创作中心":
     if "messages" not in st.session_state:
         st.session_state["messages"] = [{"role": "assistant", "content": "你好！我是未湃WAPI的智能编剧搭档。我们可以开始写大纲了吗？"}]
 
+    # 渲染历史消息
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"], avatar="🤖" if msg["role"] == "assistant" else "👤"):
             st.write(msg["content"])
 
+    # 处理输入
     if prompt := st.chat_input("输入你的创意..."):
+        # 1. 显示用户输入
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user", avatar="👤"):
             st.write(prompt)
 
+        # 2. AI 生成 (使用 write_stream 实现丝滑效果)
         with st.chat_message("assistant", avatar="🤖"):
-            stream_box = st.empty()
-            full_response = ""
             try:
                 stream = client.chat.completions.create(
                     model=TEXT_MODEL,
                     messages=st.session_state.messages,
                     stream=True
                 )
-                for chunk in stream:
-                    if chunk.choices[0].delta.content:
-                        full_response += chunk.choices[0].delta.content
-                        stream_box.write(full_response + "▌")
-                stream_box.write(full_response)
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                # --- 关键修改：使用 st.write_stream 代替手动循环 ---
+                # 这个函数会自动处理缓冲和平滑渲染，彻底告别卡顿
+                response = st.write_stream(stream)
+                # ----------------------------------------------
+                
+                st.session_state.messages.append({"role": "assistant", "content": response})
             except Exception as e:
                 st.error(f"生成失败: {e}")
 
@@ -171,7 +133,7 @@ elif mode == "🎨 分镜绘图工坊":
             if not img_prompt:
                 st.warning("请先输入画面描述！")
             else:
-                with st.spinner("AI 画师正在绘制中 (Qwen Image)..."):
+                with st.spinner("AI 画师正在绘制中..."):
                     try:
                         res = client.images.generate(
                             model=IMAGE_MODEL,
@@ -182,6 +144,5 @@ elif mode == "🎨 分镜绘图工坊":
                         st.image(image_url, use_column_width=True, caption="生成结果")
                         st.success("生成完毕！")
                         st.markdown(f"[📥 点击这里在新窗口打开图片]({image_url})")
-                        
                     except Exception as e:
                         st.error(f"绘图失败: {e}")
