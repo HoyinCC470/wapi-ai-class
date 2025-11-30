@@ -61,7 +61,7 @@ if mode == "📝 剧本/脚本创作":
             try:
                 # 强制使用千问
                 stream = client.chat.completions.create(
-                    model="qwen-turbo", 
+                    model="gpt-3.5-turbo", 
                     messages=st.session_state.messages, 
                     stream=True
                 )
@@ -89,7 +89,7 @@ elif mode == "🎨 分镜画面生成":
                         # 强制使用 Flux (请确保您 OneAPI 里有这个名字，或者做了重定向)
                         # 如果您做过重定向 dall-e-3 -> flux，这里可以改成 "dall-e-3"
                         res = client.images.generate(
-                            model="black-forest-labs/FLUX.1-schnell", 
+                            model="dall-e-3", 
                             prompt=img_prompt, 
                             size="1024x1024"
                         )
