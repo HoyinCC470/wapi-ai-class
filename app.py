@@ -14,13 +14,17 @@ TEXT_MODELS_MAP = {
     "Qwen3 14B": "Qwen/Qwen3-14B",
     
     # --- 新接入模型 (OneAPI) ---
-    "Grok 4.1": "x-ai/grok-4.1-fast:free",
-    "Gemini 2.5": "gemini-2.5-flash"
+    # "Grok 4.1" 已根据您的要求删除
+    "Gemini 2.5": "gemini-2.5-flash",
+    # --- 新增的 Qwen Coder 模型 (请根据您的 OneAPI 实际 ID 调整) ---
+    "Qwen Coder 480B": "Qwen/Qwen3-coder-480b-a35b-instruct" 
 }
 
 IMAGE_MODELS_MAP = {
     "Kwai Kolors": "Kwai-Kolors/Kolors",
-    "Qwen Image": "Qwen/Qwen-Image"
+    "Qwen Image": "Qwen/Qwen-Image",
+    # --- 新增的通义万相 Turbo 模型 ---
+    "Tongyi Turbo": "Tongyi-MAI/Z-Image-Turbo"
 }
 
 # === 2. 页面设置 ===
@@ -177,7 +181,7 @@ with st.sidebar:
     text_model_selection = st.radio(
         "选择模型", 
         list(TEXT_MODELS_MAP.keys()),
-        index=0 if st.session_state.active_workflow == 'text' else None,
+        index=st.session_state.selected_text_model_index if st.session_state.active_workflow == 'text' else None,
         key="text_radio",
         on_change=on_text_model_change,
         label_visibility="collapsed" 
@@ -187,7 +191,7 @@ with st.sidebar:
     image_model_selection = st.radio(
         "选择模型", 
         list(IMAGE_MODELS_MAP.keys()),
-        index=0 if st.session_state.active_workflow == 'image' else None,
+        index=st.session_state.selected_image_model_index if st.session_state.active_workflow == 'image' else None,
         key="image_radio",
         on_change=on_image_model_change,
         label_visibility="collapsed"
@@ -228,6 +232,7 @@ if st.session_state.active_workflow == 'text':
 
         with st.chat_message("assistant"):
             try:
+                # 确保在调用 API 时使用 `current_model_id`
                 stream = client.chat.completions.create(
                     model=current_model_id,
                     messages=st.session_state.messages,
